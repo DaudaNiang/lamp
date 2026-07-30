@@ -1,0 +1,19 @@
+# Secrets
+.env
+
+# Données scrapées (privées, générées à l'exécution)
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Claude Code local config
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
