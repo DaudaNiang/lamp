@@ -12,6 +12,7 @@ Stratégie :
 - Délai de 2s minimum entre les requêtes
 """
 
+import os
 import re
 import time
 import urllib.parse
@@ -69,12 +70,40 @@ class PagesJaunesScraper:
     def __init__(self, delay: float = 2.0):
         self.delay = delay
         self.scraper = cloudscraper.create_scraper()
+        self.scraper.headers.update({
+            "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            ),
+        })
+
+        # Fallback : sur un serveur cloud (IP datacenter), Cloudflare bloque
+        # souvent cloudscraper seul. On peut fournir un cookie de session
+        # capturé depuis un vrai navigateur (variable PJ_COOKIE_HEADER) pour
+        # se faire passer pour cette session déjà validée.
+        cookie_header = os.getenv("PJ_COOKIE_HEADER", "").strip()
+        if cookie_header:
+            self.scraper.headers.update({"Cookie": cookie_header})
+
+        self._warmed_up = False
+
+    def _warm_up(self):
+        """Visite la page d'accueil une fois pour obtenir les cookies Cloudflare."""
+        if self._warmed_up:
+            return
+        try:
+            self.scraper.get(PJ_DOMAIN, timeout=15)
+        except Exception:
+            pass
+        self._warmed_up = True
 
     # ── Requêtes réseau ──────────────────────────────────────────────────────
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
     def _get(self, url: str) -> BeautifulSoup:
         """GET avec retry automatique. Lève une exception si status != 200."""
+        self._warm_up()
         resp = self.scraper.get(url, timeout=20)
         resp.raise_for_status()
         return BeautifulSoup(resp.text, "lxml")
